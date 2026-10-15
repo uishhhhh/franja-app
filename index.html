@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Franja — viaja a tu hora</title>
+<meta name="description" content="Fija el origen y tu franja horaria. Franja busca avión, tren y barco a cualquier lugar del mundo y ordena por precio.">
+<meta name="theme-color" content="#0e1820">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#d9dfe1; --paper:#f3f5f4; --ink:#0e1820; --mute:#586871; --hot:#ff4a1c;
+  --air:#1c3fe0; --rail:#0a7b50; --sea:#0b6e8a;
+  --cond:"Bahnschrift","DIN Condensed","DIN Alternate","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font:17px/1.4 var(--cond);-webkit-font-smoothing:antialiased;min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* ---------- banda demo ---------- */
+.demo{background:var(--hot);color:var(--ink);font:700 11.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;padding:7px 14px;text-align:center}
+
+/* ---------- cabecera ---------- */
+.cab{background:var(--ink);color:var(--paper);position:relative;overflow:hidden;padding:34px 0 64px}
+.cab::after{content:"";position:absolute;top:0;bottom:0;right:-60px;width:min(46%,520px);
+  background:repeating-linear-gradient(115deg,var(--hot) 0 16px,transparent 16px 40px);opacity:.92}
+.cab .wrap{position:relative;z-index:1}
+.cab h1{font-size:clamp(72px,17vw,168px);line-height:.78;font-weight:800;letter-spacing:-.03em;text-transform:uppercase}
+.cab h1 small{display:block;font:600 clamp(12px,1.6vw,15px)/1 var(--mono);letter-spacing:.3em;margin-top:22px;color:#aab8c0}
+.cab p.lema{margin-top:18px;max-width:30ch;font:600 clamp(20px,3vw,28px)/1.1 var(--cond);text-transform:uppercase;letter-spacing:.01em;background:var(--ink);padding:6px 10px 6px 0;position:relative;z-index:2}
+.cab p.lema b{color:var(--hot);font-weight:800}
+
+/* ---------- formulario ---------- */
+main{padding-bottom:70px}
+.mesa{background:var(--paper);border:2px solid var(--ink);box-shadow:9px 9px 0 var(--ink);margin-top:-36px;position:relative;z-index:3;padding:26px 24px 24px}
+.fila{display:grid;gap:18px;margin-bottom:22px}
+.fila.f3{grid-template-columns:1.3fr 1.3fr .8fr}
+.fila.f2{grid-template-columns:1fr 1fr;gap:26px}
+.fila.f4{grid-template-columns:1fr 1fr 1.6fr;align-items:end}
+.lab{display:block;font:700 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+input[type=text],input[type=date],select{
+  width:100%;background:#fff;border:2px solid var(--ink);border-radius:0;padding:10px 12px;font:600 19px var(--cond);
+  appearance:none;-webkit-appearance:none;height:48px}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%230e1820' stroke-width='2.4'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--hot);outline-offset:0}
+input:disabled,select:disabled{background:#e4e8e7;color:#8a979e;border-color:#8a979e}
+
+.bloque{border:2px solid var(--ink);padding:24px 16px 16px;position:relative;background:linear-gradient(180deg,#fff0 0,#fff0 100%)}
+.bloque .tag{position:absolute;top:-13px;left:14px;background:var(--ink);color:var(--paper);font:700 12px var(--mono);padding:3px 10px;letter-spacing:.2em}
+.bloque.off{opacity:.45;pointer-events:none}
+.bloque .sub{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.seg{display:flex;border:2px solid var(--ink);margin-bottom:10px}
+.seg button{flex:1;border:0;background:#fff;padding:9px 6px;font:700 14px var(--cond);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.seg button+button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+
+.combo{position:relative}
+.combo ul{list-style:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:2px solid var(--ink);border-top:0;max-height:330px;overflow:auto;box-shadow:6px 6px 0 var(--ink)}
+.combo li{padding:9px 12px;display:flex;justify-content:space-between;gap:10px;cursor:pointer;border-bottom:1px solid #d9dfe1;font-weight:600}
+.combo li small{font:500 11px var(--mono);color:var(--mute);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.combo li.on,.combo li:hover{background:var(--ink);color:var(--paper)}
+.combo li.on small,.combo li:hover small{color:#aab8c0}
+.combo li.any{background:var(--hot);color:var(--ink)}
+.combo li.vacio{cursor:default;color:var(--mute)}
+
+.modos{display:flex;gap:8px;flex-wrap:wrap}
+.chip{position:relative;cursor:pointer}
+.chip input{position:absolute;opacity:0;inset:0}
+.chip span{display:flex;align-items:center;gap:8px;border:2px solid var(--ink);padding:0 14px;height:48px;background:#fff;font:700 15px var(--cond);text-transform:uppercase;letter-spacing:.06em}
+.chip input:checked+span{background:var(--ink);color:var(--paper)}
+.chip input:focus-visible+span{outline:3px solid var(--hot)}
+.ico{width:20px;height:20px;fill:currentColor;flex:none}
+.sw{display:flex;align-items:center;gap:10px;cursor:pointer;height:48px;font:700 15px var(--cond);text-transform:uppercase;letter-spacing:.06em}
+.sw input{width:22px;height:22px;accent-color:var(--ink)}
+
+.accion{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-top:4px}
+.go{background:var(--hot);border:2px solid var(--ink);box-shadow:6px 6px 0 var(--ink);padding:14px 34px;font:800 24px var(--cond);text-transform:uppercase;letter-spacing:.05em;cursor:pointer;transition:transform .08s,box-shadow .08s}
+.go:hover{transform:translate(3px,3px);box-shadow:3px 3px 0 var(--ink)}
+.go:disabled{background:#c5cdd1;cursor:wait;transform:none;box-shadow:6px 6px 0 var(--ink)}
+.aviso{font:600 13px var(--mono);color:#b3260a;min-height:1.2em}
+
+/* ---------- resultados ---------- */
+#res{margin-top:46px}
+.cabres{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;border-bottom:3px solid var(--ink);padding-bottom:12px;margin-bottom:26px}
+.cabres h2{font:800 clamp(28px,4.4vw,44px)/1 var(--cond);text-transform:uppercase;letter-spacing:-.01em}
+.cabres h2 em{font-style:normal;background:var(--hot);padding:0 8px}
+.meta{font:500 12px/1.6 var(--mono);color:var(--mute);letter-spacing:.04em;max-width:60ch}
+.meta b{color:var(--ink)}
+
+.billete{display:grid;grid-template-columns:178px 1fr;background:var(--paper);border:2px solid var(--ink);margin-bottom:26px;position:relative;box-shadow:6px 6px 0 rgba(14,24,32,.9)}
+.billete::before,.billete::after{content:"";position:absolute;left:167px;width:20px;height:20px;border-radius:50%;background:var(--bg);border:2px solid var(--ink);z-index:2}
+.billete::before{top:-12px;clip-path:inset(50% 0 0 0)}
+.billete::after{bottom:-12px;clip-path:inset(0 0 50% 0)}
+.stub{border-right:2px dashed var(--ink);padding:16px 14px;display:flex;flex-direction:column;justify-content:space-between;gap:14px;background:var(--ink);color:var(--paper)}
+.stub .n{font:600 12px var(--mono);letter-spacing:.2em;color:#9fb0b9}
+.precio{font:800 58px/.9 var(--cond);letter-spacing:-.02em}
+.precio sup{font-size:26px;vertical-align:top;margin-left:2px;color:var(--hot)}
+.stub .nota{font:500 11px/1.4 var(--mono);color:#9fb0b9;text-transform:uppercase;letter-spacing:.08em}
+.cuerpo{padding:16px 20px 14px}
+.dest{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.dest h3{font:800 clamp(28px,4vw,40px)/1 var(--cond);text-transform:uppercase;letter-spacing:-.01em}
+.pais{font:600 11.5px var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.12em}
+.cod{margin-left:auto;font:700 12px var(--mono);border:2px solid var(--ink);padding:1px 8px;letter-spacing:.14em}
+
+.tr{display:grid;grid-template-columns:56px 98px 1fr auto;gap:6px 14px;align-items:center;padding:11px 0;border-top:2px solid var(--ink)}
+.tr .et{font:700 11px var(--mono);letter-spacing:.18em;background:var(--ink);color:var(--paper);padding:3px 0;text-align:center}
+.tr .fe{font:700 15px var(--cond);text-transform:uppercase;letter-spacing:.04em}
+.tr .hh{font:600 22px var(--cond);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tr .hh i{font:600 11px var(--mono);color:var(--mute);font-style:normal;letter-spacing:.1em}
+.tr .hh sup{font:700 11px var(--mono);color:var(--hot)}
+.tr .hh .fl{font-size:16px;color:var(--mute)}
+.tr .du{font:700 14px var(--mono);text-align:right;white-space:nowrap}
+.tr .dd{grid-column:2/5;font:500 12px/1.5 var(--mono);color:var(--mute)}
+.tr .dd .m{display:inline-flex;align-items:center;gap:5px;color:var(--ink);font-weight:700;margin-right:8px}
+.tr .dd .m svg{width:14px;height:14px}
+.m.avion,.ico.avion{color:var(--air)} .m.tren,.ico.tren{color:var(--rail)} .m.barco,.ico.barco{color:var(--sea)}
+
+.pie{border-top:2px solid var(--ink);padding-top:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+details.alts summary{list-style:none;cursor:pointer;font:700 14px var(--cond);text-transform:uppercase;letter-spacing:.08em;border:2px solid var(--ink);padding:7px 14px;display:inline-block;background:#fff}
+details.alts summary::-webkit-details-marker{display:none}
+details.alts[open] summary{background:var(--ink);color:var(--paper)}
+details.alts summary::after{content:" +"} details.alts[open] summary::after{content:" −"}
+.altlist{margin-top:12px;border:2px solid var(--ink);background:#fff}
+.alt{display:grid;grid-template-columns:1.1fr 1.5fr 1.5fr 80px;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #c5cdd1;font:600 15px var(--cond)}
+.alt:last-child{border-bottom:0}
+.alt .p{font:800 22px var(--cond);text-align:right}
+.alt .p small{display:block;font:600 10.5px var(--mono);color:var(--mute)}
+.alt .s{font:500 12px var(--mono);color:var(--mute);display:block}
+.alt .ic{display:inline-flex;gap:3px;vertical-align:middle;margin-left:4px}
+.alt .ic svg{width:14px;height:14px}
+.enl{display:flex;gap:8px;flex-wrap:wrap}
+.enl a{font:700 13px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-decoration:none;border-bottom:3px solid var(--hot);padding:2px 0}
+.enl a:hover{background:var(--hot)}
+
+.vacio-res{border:2px dashed var(--ink);padding:34px 26px;background:var(--paper)}
+.vacio-res h3{font:800 32px/1 var(--cond);text-transform:uppercase;margin-bottom:10px}
+.vacio-res li{margin:6px 0 0 18px;font-weight:600}
+
+.prog{border:2px solid var(--ink);height:18px;background:var(--paper);margin:14px 0 8px;overflow:hidden}
+.prog div{height:100%;width:0;background:repeating-linear-gradient(115deg,var(--hot) 0 10px,var(--ink) 10px 20px);background-size:28px 100%;animation:mueve .7s linear infinite;transition:width .15s}
+@keyframes mueve{to{background-position:28px 0}}
+.progtxt{font:600 12px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+
+footer{border-top:3px solid var(--ink);margin-top:20px;padding:22px 0 50px;font:500 12.5px/1.7 var(--mono);color:var(--mute)}
+footer b{color:var(--ink)}
+
+@media (max-width:860px){
+  .fila.f3,.fila.f2,.fila.f4{grid-template-columns:1fr}
+  .billete{grid-template-columns:1fr}
+  .billete::before,.billete::after{display:none}
+  .stub{border-right:0;border-bottom:2px dashed var(--ink);flex-direction:row;align-items:flex-end}
+  .tr{grid-template-columns:52px 1fr auto}
+  .tr .fe{grid-column:2}
+  .tr .hh{grid-column:1/4;order:5}
+  .tr .dd{grid-column:1/4}
+  .alt{grid-template-columns:1fr 70px}
+  .alt>div:nth-child(2),.alt>div:nth-child(3){grid-column:1}
+  .alt .p{grid-row:1;grid-column:2}
+  .cab::after{width:36%}
+}
+@media (prefers-reduced-motion:reduce){.prog div{animation:none}.go{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="demo" id="demo" hidden>Modo demostración · precios y horarios simulados · no es una oferta real</div>
+
+<header class="cab">
+  <div class="wrap">
+    <h1>Franja<small>A TU HORA · AVIÓN / TREN / BARCO · TODO EL MUNDO</small></h1>
+    <p class="lema">Fijas el origen y tu <b>franja</b>. El destino, que lo busque otro.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+<form class="mesa" id="f" autocomplete="off" novalidate>
+  <div class="fila f3">
+    <div><label class="lab" for="origenIn">Origen (fijo)</label><div class="combo" id="origen"></div></div>
+    <div><label class="lab" for="destinoIn">Destino</label><div class="combo" id="destino"></div></div>
+    <div id="zonaBox"><label class="lab" for="zona">Zona</label>
+      <select id="zona">
+        <option value="*">Todo el mundo</option><option value="EU">Europa</option><option value="AF">África</option>
+        <option value="AS">Asia y Oriente Medio</option><option value="AM">América</option><option value="OC">Oceanía</option>
+      </select></div>
+  </div>
+
+  <div class="fila f2">
+    <div class="bloque" id="bIda"><span class="tag">IDA</span>
+      <div class="seg" data-grp="ida"><button type="button" data-m="fecha" aria-pressed="true">Fecha concreta</button><button type="button" data-m="any" aria-pressed="false">Cualquier día</button></div>
+      <input type="date" id="idaFecha" aria-label="Fecha de ida">
+      <div class="sub">
+        <div><label class="lab" for="idaSale">Salgo desde</label><select id="idaSale"></select></div>
+        <div><label class="lab" for="idaLlega">Llego antes de</label><select id="idaLlega"></select></div>
+      </div>
+    </div>
+    <div class="bloque" id="bVuelta"><span class="tag">VUELTA</span>
+      <div class="seg" data-grp="vuelta"><button type="button" data-m="fecha" aria-pressed="true">Fecha concreta</button><button type="button" data-m="any" aria-pressed="false">Cualquier día</button></div>
+      <input type="date" id="vFecha" aria-label="Fecha de vuelta">
+      <div class="sub">
+        <div><label class="lab" for="vSale">Salgo desde</label><select id="vSale"></select></div>
+        <div><label class="lab" for="vLlega">Llego antes de</label><select id="vLlega"></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fila f4">
+    <div><label class="lab" for="maxDur">Duración máx. por trayecto</label>
+      <select id="maxDur">
+        <option value="">Cualquiera</option><option value="120">2 h</option><option value="180">3 h</option><option value="240">4 h</option>
+        <option value="360">6 h</option><option value="480">8 h</option><option value="720">12 h</option><option value="1080">18 h</option>
+        <option value="1440">24 h</option><option value="2160">36 h</option><option value="2880">48 h</option>
+      </select></div>
+    <div id="estBox"><label class="lab" for="estancia">Estancia</label>
+      <select id="estancia">
+        <option value="1-14">Cualquiera (1–14 noches)</option><option value="1-3">Escapada (1–3)</option><option value="2-4">Puente (2–4)</option>
+        <option value="4-7">Una semana (4–7)</option><option value="7-14">Larga (7–14)</option>
+      </select></div>
+    <div>
+      <span class="lab">Medios y trayecto</span>
+      <div class="modos">
+        <label class="chip"><input type="checkbox" name="modo" value="avion" checked><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V8l-8 5v2l8-2.5V18l-2 1.5V21l3.5-1 3.5 1v-1.5L13 18v-5.5z"/></svg>Avión</span></label>
+        <label class="chip"><input type="checkbox" name="modo" value="tren" checked><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M6 3h12a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3l1.5 2.5h-2L15 18H9l-1.5 2.5h-2L7 18a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2zm0 2v5h12V5zm1.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>Tren</span></label>
+        <label class="chip"><input type="checkbox" name="modo" value="barco" checked><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15l2 5h14l2-5-9-2.5z"/><path d="M7 11h10v3.2l-5-1.4-5 1.4zM10 5h4v5h-4z"/></svg>Barco</span></label>
+        <label class="sw"><input type="checkbox" id="soloIda"> Solo ida</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="accion">
+    <div class="aviso" id="aviso" role="alert"></div>
+    <button class="go" id="buscar" type="submit">Buscar franja →</button>
+  </div>
+</form>
+
+<section id="res" aria-live="polite"></section>
+
+<footer>
+  <b>Franja no vende billetes.</b> Compara y te manda al proveedor para reservar, como un metabuscador. Todas las horas son <b>locales</b> de cada ciudad
+  (con sus reglas de horario de verano). El barco solo une puertos de la misma cuenca marítima; si tu origen o destino es interior, aparece como tramo
+  combinado con tren hasta/desde el puerto.
+</footer>
+</main>
+
+<script>
+/* =====================================================================
+   MOTOR  (sin DOM: se puede probar en Node)
+   ===================================================================== */
+const CONFIG = {
+  MODE: 'mock',        // 'mock' | 'live'
+  PROXY_URL: '',       // en live: URL del proxy (p. ej. un Cloudflare Worker) que guarda las credenciales
+  TOP_N: 50,           // destinos mostrados como máximo
+  MAX_POR_PAIS: 3,     // variedad: tope por país antes de rellenar
+  VENTANA_DIAS: 30,    // ventana de "cualquier día"
+  ALTERNATIVAS: 6,     // combinaciones extra por destino
+  ESCALA_KM: 9500,     // por encima, el vuelo lleva escala
+  ENLACES: { avion:['Aviasales','https://www.aviasales.es/'], tren:['Trainline','https://www.thetrainline.com/'], barco:['Mr Ferry','https://www.misterferry.com/'] }
+};
+
+/* ---------- utilidades ---------- */
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+function hash(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rng = (...p) => mulberry32(hash(p.join('|')));      // semilla: origen, destino, fecha, modo
+const pad = n => String(n).padStart(2,'0');
+const addDays = (s,n) => new Date(Date.parse(s+'T00:00:00Z')+n*864e5).toISOString().slice(0,10);
+const diffDays = (a,b) => Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/864e5);
+const dow = s => new Date(s+'T00:00:00Z').getUTCDay();
+let HOY = (()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())})();
+let AHORA = Date.now();
+
+/* ---------- husos horarios con reglas reales (base IANA del navegador) ---------- */
+const _fmt = {};
+function rawOff(tz, ms){
+  const f = _fmt[tz] || (_fmt[tz] = new Intl.DateTimeFormat('en-US',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'}));
+  const p={}; for(const x of f.formatToParts(ms)) if(x.type!=='literal') p[x.type]=+x.value;
+  const asUtc = Date.UTC(p.year,p.month-1,p.day,p.hour===24?0:p.hour,p.minute,p.second);
+  return Math.round((asUtc-Math.floor(ms/1000)*1000)/60000);
+}
+const _oc = {};
+function tzOffset(tz, ms){               // minutos respecto a UTC; cachea por zona y día
+  const day=Math.floor(ms/864e5), k=tz+'|'+day; let e=_oc[k];
+  if(!e) e=_oc[k]=[rawOff(tz,day*864e5), rawOff(tz,day*864e5+864e5-1)];
+  return e[0]===e[1] ? e[0] : rawOff(tz,ms);
+}
+function localToUtc(tz, date, min){      // fecha local + minutos desde medianoche -> ms UTC
+  const [y,m,d]=date.split('-').map(Number);
+  const naive=Date.UTC(y,m-1,d,0,0)+min*60000;
+  let off=tzOffset(tz,naive), utc=naive-off*60000;
+  const off2=tzOffset(tz,utc); if(off2!==off) utc=naive-off2*60000;
+  return utc;
+}
+function utcToLocal(tz, ms){
+  const off=tzOffset(tz,ms), d=new Date(ms+off*60000);
+  return {date:d.toISOString().slice(0,10), min:d.getUTCHours()*60+d.getUTCMinutes(), off};
+}
+
+/* ---------- catálogo mundial ----------
+   id|nombre|país|lat|lon|huso|capacidades|alias
+   A = aeropuerto · R:grupo = red ferroviaria · P:cuenca = puerto · H:ids = puertos a los que se llega en tren si es interior */
+const PAISES={ES:'España',PT:'Portugal',FR:'Francia',GB:'Reino Unido',IE:'Irlanda',NL:'Países Bajos',BE:'Bélgica',DE:'Alemania',CH:'Suiza',AT:'Austria',CZ:'Chequia',PL:'Polonia',HU:'Hungría',IT:'Italia',HR:'Croacia',GR:'Grecia',MT:'Malta',TR:'Turquía',DK:'Dinamarca',SE:'Suecia',NO:'Noruega',FI:'Finlandia',EE:'Estonia',LV:'Letonia',MA:'Marruecos',TN:'Túnez',DZ:'Argelia',EG:'Egipto',ZA:'Sudáfrica',TZ:'Tanzania',KE:'Kenia',GH:'Ghana',NG:'Nigeria',ET:'Etiopía',SN:'Senegal',AE:'Emiratos Árabes',QA:'Catar',IL:'Israel',JO:'Jordania',JP:'Japón',KR:'Corea del Sur',CN:'China',HK:'Hong Kong',TW:'Taiwán',TH:'Tailandia',VN:'Vietnam',SG:'Singapur',ID:'Indonesia',PH:'Filipinas',IN:'India',AU:'Australia',NZ:'Nueva Zelanda',US:'EE. UU.',CA:'Canadá',BS:'Bahamas',PR:'Puerto Rico',MX:'México',CU:'Cuba',CO:'Colombia',PE:'Perú',CL:'Chile',AR:'Argentina',UY:'Uruguay',BR:'Brasil'};
+const CONT={};
+for(const [c,l] of Object.entries({EU:'ES PT FR GB IE NL BE DE CH AT CZ PL HU IT HR GR MT TR DK SE NO FI EE LV',AF:'MA TN DZ EG ZA TZ KE GH NG ET SN',AS:'AE QA IL JO JP KR CN HK TW TH VN SG ID PH IN',OC:'AU NZ',AM:'US CA BS PR MX CU CO PE CL AR UY BR'})) l.split(' ').forEach(x=>CONT[x]=c);
+
+const RAW = `
+MAD|Madrid|ES|40.42|-3.70|Europe/Madrid|A R:EUR H:VLC,BCN,CDZ|
+BCN|Barcelona|ES|41.39|2.17|Europe/Madrid|A R:EUR P:MED|
+VLC|Valencia|ES|39.47|-0.38|Europe/Madrid|A R:EUR P:MED|
+SVQ|Sevilla|ES|37.39|-5.98|Europe/Madrid|A R:EUR H:CDZ|Seville
+AGP|Málaga|ES|36.72|-4.42|Europe/Madrid|A R:EUR P:MED|Malaga
+PMI|Palma de Mallorca|ES|39.57|2.65|Europe/Madrid|A P:MED|Mallorca,Majorca
+IBZ|Ibiza|ES|38.91|1.43|Europe/Madrid|A P:MED|Eivissa
+BIO|Bilbao|ES|43.26|-2.93|Europe/Madrid|A R:EUR P:NORD|
+SDR|Santander|ES|43.46|-3.80|Europe/Madrid|A R:EUR P:NORD|
+SCQ|Santiago de Compostela|ES|42.88|-8.54|Europe/Madrid|A R:EUR H:SDR,BIO|Santiago
+LPA|Las Palmas de Gran Canaria|ES|28.10|-15.41|Atlantic/Canary|A P:ATLC|Gran Canaria
+TCI|Tenerife|ES|28.47|-16.25|Atlantic/Canary|A P:ATLC|Santa Cruz de Tenerife
+CDZ|Cádiz|ES|36.53|-6.29|Europe/Madrid|R:EUR P:ATLC|Cadiz
+AEI|Algeciras|ES|36.13|-5.45|Europe/Madrid|R:EUR P:MED|
+LIS|Lisboa|PT|38.72|-9.14|Europe/Lisbon|A R:EUR|Lisbon
+OPO|Oporto|PT|41.15|-8.61|Europe/Lisbon|A R:EUR|Porto
+FNC|Funchal|PT|32.65|-16.91|Atlantic/Madeira|A|Madeira
+PAR|París|FR|48.86|2.35|Europe/Paris|A R:EUR H:CQF|Paris
+CQF|Calais|FR|50.95|1.86|Europe/Paris|R:EUR P:NORD|
+MRS|Marsella|FR|43.30|5.37|Europe/Paris|A R:EUR P:MED|Marseille
+NCE|Niza|FR|43.70|7.27|Europe/Paris|A R:EUR P:MED|Nice
+LYS|Lyon|FR|45.76|4.84|Europe/Paris|A R:EUR H:MRS|
+BOD|Burdeos|FR|44.84|-0.58|Europe/Paris|A R:EUR|Bordeaux
+AJA|Ajaccio|FR|41.92|8.74|Europe/Paris|A P:MED|Córcega,Corsica
+LON|Londres|GB|51.51|-0.13|Europe/London|A R:EUR H:DVR|London
+DVR|Dover|GB|51.13|1.31|Europe/London|R:EUR P:NORD|
+PME|Portsmouth|GB|50.82|-1.09|Europe/London|R:EUR P:NORD|
+EDI|Edimburgo|GB|55.95|-3.19|Europe/London|A R:EUR|Edinburgh
+MAN|Mánchester|GB|53.48|-2.24|Europe/London|A R:EUR|Manchester
+NCL|Newcastle|GB|54.98|-1.62|Europe/London|A R:EUR P:NORD|
+DUB|Dublín|IE|53.35|-6.26|Europe/Dublin|A P:NORD|Dublin
+AMS|Ámsterdam|NL|52.37|4.90|Europe/Amsterdam|A R:EUR P:NORD|Amsterdam
+RTM|Róterdam|NL|51.92|4.48|Europe/Amsterdam|R:EUR P:NORD|Rotterdam
+BRU|Bruselas|BE|50.85|4.35|Europe/Brussels|A R:EUR H:CQF|Brussels
+BER|Berlín|DE|52.52|13.40|Europe/Berlin|A R:EUR H:KEL|Berlin
+MUC|Múnich|DE|48.14|11.58|Europe/Berlin|A R:EUR|Munich,München
+FRA|Fráncfort|DE|50.11|8.68|Europe/Berlin|A R:EUR|Frankfurt
+HAM|Hamburgo|DE|53.55|9.99|Europe/Berlin|A R:EUR|Hamburg
+KEL|Kiel|DE|54.32|10.14|Europe/Berlin|R:EUR P:NORD|
+ZRH|Zúrich|CH|47.38|8.54|Europe/Zurich|A R:EUR|Zurich
+VIE|Viena|AT|48.21|16.37|Europe/Vienna|A R:EUR|Wien,Vienna
+PRG|Praga|CZ|50.08|14.44|Europe/Prague|A R:EUR|Prague
+WAW|Varsovia|PL|52.23|21.01|Europe/Warsaw|A R:EUR|Warsaw
+GDN|Gdansk|PL|54.35|18.65|Europe/Warsaw|A R:EUR P:NORD|Gdańsk
+BUD|Budapest|HU|47.50|19.04|Europe/Budapest|A R:EUR|
+ROM|Roma|IT|41.90|12.50|Europe/Rome|A R:EUR H:NAP|Rome
+MIL|Milán|IT|45.46|9.19|Europe/Rome|A R:EUR H:GOA|Milan
+GOA|Génova|IT|44.41|8.93|Europe/Rome|A R:EUR P:MED|Genoa
+NAP|Nápoles|IT|40.85|14.27|Europe/Rome|A R:EUR P:MED|Naples
+VCE|Venecia|IT|45.44|12.32|Europe/Rome|A R:EUR P:MED|Venice
+FLR|Florencia|IT|43.77|11.26|Europe/Rome|A R:EUR|Firenze,Florence
+PMO|Palermo|IT|38.12|13.36|Europe/Rome|A P:MED|Sicilia
+CAG|Cagliari|IT|39.22|9.12|Europe/Rome|A P:MED|Cerdeña,Sardinia
+BRI|Bari|IT|41.12|16.87|Europe/Rome|A R:EUR P:MED|
+SPU|Split|HR|43.51|16.44|Europe/Zagreb|A P:MED|
+DBV|Dubrovnik|HR|42.65|18.09|Europe/Zagreb|A P:MED|
+ATH|Atenas|GR|37.98|23.73|Europe/Athens|A P:MED|Athens
+HER|Heraklion|GR|35.34|25.13|Europe/Athens|A P:MED|Creta,Crete
+MLA|La Valeta|MT|35.90|14.51|Europe/Malta|A P:MED|Malta,Valletta
+IST|Estambul|TR|41.01|28.98|Europe/Istanbul|A R:EUR|Istanbul
+CPH|Copenhague|DK|55.68|12.57|Europe/Copenhagen|A R:EUR P:NORD|Copenhagen
+ARN|Estocolmo|SE|59.33|18.07|Europe/Stockholm|A R:EUR P:NORD|Stockholm
+GOT|Gotemburgo|SE|57.71|11.97|Europe/Stockholm|A R:EUR P:NORD|Gothenburg
+OSL|Oslo|NO|59.91|10.75|Europe/Oslo|A R:EUR P:NORD|
+HEL|Helsinki|FI|60.17|24.94|Europe/Helsinki|A P:NORD|
+TLL|Tallin|EE|59.44|24.75|Europe/Tallinn|A P:NORD|Tallinn
+RIX|Riga|LV|56.95|24.11|Europe/Riga|A P:NORD|
+TNG|Tánger|MA|35.76|-5.83|Africa/Casablanca|A R:MAR P:MED|Tangier
+CMN|Casablanca|MA|33.57|-7.59|Africa/Casablanca|A R:MAR|
+RAK|Marrakech|MA|31.63|-8.01|Africa/Casablanca|A R:MAR|Marrakesh
+TUN|Túnez|TN|36.81|10.18|Africa/Tunis|A P:MED|Tunis
+ALG|Argel|DZ|36.75|3.06|Africa/Algiers|A P:MED|Algiers
+CAI|El Cairo|EG|30.04|31.24|Africa/Cairo|A R:EGY|Cairo
+ALY|Alejandría|EG|31.20|29.92|Africa/Cairo|A R:EGY P:MED|Alexandria
+JNB|Johannesburgo|ZA|-26.20|28.05|Africa/Johannesburg|A R:ZAF|Johannesburg
+CPT|Ciudad del Cabo|ZA|-33.92|18.42|Africa/Johannesburg|A R:ZAF|Cape Town
+DAR|Dar es Salaam|TZ|-6.79|39.21|Africa/Dar_es_Salaam|A P:TZ|
+ZNZ|Zanzíbar|TZ|-6.16|39.19|Africa/Dar_es_Salaam|A P:TZ|Zanzibar
+NBO|Nairobi|KE|-1.29|36.82|Africa/Nairobi|A|
+ACC|Accra|GH|5.60|-0.19|Africa/Accra|A|
+LOS|Lagos|NG|6.52|3.38|Africa/Lagos|A|
+ADD|Adís Abeba|ET|9.03|38.74|Africa/Addis_Ababa|A|Addis Ababa
+DKR|Dakar|SN|14.72|-17.47|Africa/Dakar|A|
+DXB|Dubái|AE|25.20|55.27|Asia/Dubai|A|Dubai
+DOH|Doha|QA|25.29|51.53|Asia/Qatar|A|
+TLV|Tel Aviv|IL|32.09|34.78|Asia/Jerusalem|A|
+AMM|Amán|JO|31.95|35.93|Asia/Amman|A|Amman
+TYO|Tokio|JP|35.68|139.69|Asia/Tokyo|A R:JPN P:EAS|Tokyo
+OSA|Osaka|JP|34.69|135.50|Asia/Tokyo|A R:JPN P:EAS|
+KYO|Kioto|JP|35.01|135.77|Asia/Tokyo|R:JPN|Kyoto
+SEL|Seúl|KR|37.57|126.98|Asia/Seoul|A R:KOR P:EAS|Seoul
+PUS|Busan|KR|35.18|129.08|Asia/Seoul|A R:KOR P:EAS|Pusan
+PEK|Pekín|CN|39.90|116.40|Asia/Shanghai|A R:CHN|Beijing
+SHA|Shanghái|CN|31.23|121.47|Asia/Shanghai|A R:CHN P:EAS|Shanghai
+CAN|Cantón|CN|23.13|113.26|Asia/Shanghai|A R:CHN|Guangzhou
+HKG|Hong Kong|HK|22.32|114.17|Asia/Hong_Kong|A R:CHN P:EAS|
+TPE|Taipéi|TW|25.03|121.57|Asia/Taipei|A P:EAS|Taipei
+BKK|Bangkok|TH|13.76|100.50|Asia/Bangkok|A R:THA|
+CNX|Chiang Mai|TH|18.79|98.98|Asia/Bangkok|A R:THA|
+SGN|Ho Chi Minh|VN|10.82|106.63|Asia/Ho_Chi_Minh|A R:VNM P:SEAS|Saigón,Saigon
+HAN|Hanoi|VN|21.03|105.85|Asia/Bangkok|A R:VNM|
+SIN|Singapur|SG|1.35|103.82|Asia/Singapore|A P:SEAS|Singapore
+CGK|Yakarta|ID|-6.21|106.85|Asia/Jakarta|A P:SEAS|Jakarta
+MNL|Manila|PH|14.60|120.98|Asia/Manila|A P:SEAS|
+DPS|Bali|ID|-8.65|115.22|Asia/Makassar|A P:SEAS|Denpasar
+DEL|Nueva Delhi|IN|28.61|77.21|Asia/Kolkata|A R:IND|Delhi,New Delhi
+BOM|Bombay|IN|19.08|72.88|Asia/Kolkata|A R:IND|Mumbai
+SYD|Sídney|AU|-33.87|151.21|Australia/Sydney|A R:AUS|Sydney
+MEL|Melbourne|AU|-37.81|144.96|Australia/Melbourne|A R:AUS|
+AKL|Auckland|NZ|-36.85|174.76|Pacific/Auckland|A|
+NYC|Nueva York|US|40.71|-74.01|America/New_York|A R:NAE|New York,NYC
+BOS|Boston|US|42.36|-71.06|America/New_York|A R:NAE|
+WAS|Washington D. C.|US|38.91|-77.04|America/New_York|A R:NAE|Washington
+CHI|Chicago|US|41.88|-87.63|America/Chicago|A R:NAE|
+YTO|Toronto|CA|43.65|-79.38|America/Toronto|A R:NAE|
+YMQ|Montreal|CA|45.50|-73.57|America/Toronto|A R:NAE|Montréal
+MIA|Miami|US|25.76|-80.19|America/New_York|A P:CARI|
+NAS|Nassau|BS|25.05|-77.36|America/Nassau|A P:CARI|
+SJU|San Juan|PR|18.47|-66.11|America/Puerto_Rico|A P:CARI|
+CUN|Cancún|MX|21.16|-86.85|America/Cancun|A P:CARI|Cancun
+LAX|Los Ángeles|US|34.05|-118.24|America/Los_Angeles|A|Los Angeles
+SFO|San Francisco|US|37.77|-122.42|America/Los_Angeles|A|
+SEA|Seattle|US|47.61|-122.33|America/Los_Angeles|A R:CAS P:NAW|
+YVR|Vancouver|CA|49.28|-123.12|America/Vancouver|A R:CAS P:NAW|
+MEX|Ciudad de México|MX|19.43|-99.13|America/Mexico_City|A|Mexico City,CDMX
+HAV|La Habana|CU|23.11|-82.37|America/Havana|A|Havana
+BOG|Bogotá|CO|4.71|-74.07|America/Bogota|A|
+LIM|Lima|PE|-12.05|-77.04|America/Lima|A|
+SCL|Santiago de Chile|CL|-33.45|-70.67|America/Santiago|A|
+EZE|Buenos Aires|AR|-34.60|-58.38|America/Argentina/Buenos_Aires|A P:RPLA|
+MVD|Montevideo|UY|-34.90|-56.19|America/Montevideo|A P:RPLA|
+GRU|São Paulo|BR|-23.55|-46.63|America/Sao_Paulo|A|Sao Paulo
+GIG|Río de Janeiro|BR|-22.91|-43.17|America/Sao_Paulo|A|Rio de Janeiro,Rio
+`;
+const PLACES = RAW.trim().split('\n').map(l=>{
+  const [id,name,cc,lat,lon,tz,fl,al]=l.split('|');
+  const p={id,name,cc,lat:+lat,lon:+lon,tz,pais:PAISES[cc],cont:CONT[cc],alias:al?al.split(','):[],air:false,rail:null,port:null,hubs:[]};
+  for(const f of fl.trim().split(/\s+/)){ if(f==='A')p.air=true; else if(f[0]==='R')p.rail=f.slice(2); else if(f[0]==='P')p.port=f.slice(2); else if(f[0]==='H')p.hubs=f.slice(2).split(','); }
+  p.k=[norm(name),...p.alias.map(norm),id.toLowerCase()];
+  p.kp=norm(p.pais);
+  return p;
+});
+const BY = Object.fromEntries(PLACES.map(p=>[p.id,p]));
+
+function km(a,b){
+  const R=6371, r=Math.PI/180, dLa=(b.lat-a.lat)*r, dLo=(b.lon-a.lon)*r;
+  const h=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+
+/* ---------- operadores ---------- */
+const CARR={ES:'Iberia:IB,Vueling:VY,Air Europa:UX',PT:'TAP:TP',FR:'Air France:AF,Transavia:TO',GB:'British Airways:BA,easyJet:U2',IE:'Ryanair:FR,Aer Lingus:EI',NL:'KLM:KL,Transavia:HV',BE:'Brussels Airlines:SN',DE:'Lufthansa:LH,Eurowings:EW',CH:'Swiss:LX',AT:'Austrian:OS',CZ:'Smartwings:QS',PL:'LOT:LO',HU:'Wizz Air:W6',IT:'ITA Airways:AZ',HR:'Croatia Airlines:OU',GR:'Aegean:A3',MT:'KM Malta Airlines:KM',TR:'Turkish Airlines:TK,Pegasus:PC',DK:'SAS:SK',SE:'SAS:SK',NO:'Norwegian:DY',FI:'Finnair:AY',EE:'airBaltic:BT',LV:'airBaltic:BT',MA:'Royal Air Maroc:AT',TN:'Tunisair:TU',DZ:'Air Algérie:AH',EG:'EgyptAir:MS',ZA:'South African:SA',TZ:'Ethiopian:ET',KE:'Kenya Airways:KQ',GH:'Ethiopian:ET',NG:'Air Peace:P4',ET:'Ethiopian:ET',SN:'Air Sénégal:HC',AE:'Emirates:EK',QA:'Qatar Airways:QR',IL:'El Al:LY',JO:'Royal Jordanian:RJ',JP:'JAL:JL,ANA:NH',KR:'Korean Air:KE',CN:'Air China:CA,China Eastern:MU',HK:'Cathay Pacific:CX',TW:'EVA Air:BR',TH:'Thai Airways:TG',VN:'Vietnam Airlines:VN',SG:'Singapore Airlines:SQ',ID:'Garuda:GA',PH:'Philippine Airlines:PR',IN:'Air India:AI,IndiGo:6E',AU:'Qantas:QF',NZ:'Air New Zealand:NZ',US:'United:UA,Delta:DL,American:AA',CA:'Air Canada:AC',BS:'Bahamasair:UP',PR:'JetBlue:B6',MX:'Aeroméxico:AM',CU:'Cubana:CU',CO:'Avianca:AV',PE:'LATAM:LA',CL:'LATAM:LA',AR:'Aerolíneas Argentinas:AR',UY:'LATAM:LA',BR:'LATAM:LA,GOL:G3'};
+const LOWCOST=['Ryanair:FR','easyJet:U2','Vueling:VY','Wizz Air:W6'];
+const parseC = s => { const [n,c]=s.split(':'); return {n,c}; };
+function carriers(a,b,low){
+  const pool=[...(CARR[a.cc]||'').split(','),...(CARR[b.cc]||'').split(',')].filter(Boolean);
+  if(low) pool.push(...LOWCOST);
+  return (pool.length?pool:['Aerolínea regional:XX']).map(parseC);
+}
+const OPER_EU={ES:'Renfe AVE',FR:'SNCF TGV inOui',DE:'DB ICE',IT:'Trenitalia Frecciarossa',GB:'LNER',NL:'NS',BE:'SNCB',CH:'SBB',AT:'ÖBB Railjet',PT:'CP Alfa Pendular',CZ:'České dráhy',PL:'PKP Intercity',HU:'MÁV',DK:'DSB',SE:'SJ',NO:'Vy',TR:'TCDD YHT',HR:'HŽPP',GR:'Hellenic Train'};
+const OPER={JPN:'JR Shinkansen',CHN:'CR Fuxing',KOR:'Korail KTX',IND:'Vande Bharat',NAE:'Amtrak',CAS:'Amtrak Cascades',AUS:'NSW TrainLink',ZAF:'Shosholoza Meyl',MAR:'ONCF Al Boraq',EGY:'ENR',THA:'SRT',VNM:'Vietnam Railways'};
+const FERRY={MED:['Baleària','Trasmed','GNV','Grimaldi Lines','Moby','Minoan Lines','Corsica Ferries','Tirrenia'],NORD:['Brittany Ferries','DFDS','P&O Ferries','Stena Line','Irish Ferries','Tallink','Viking Line','Finnlines'],ATLC:['Naviera Armas','Fred. Olsen Express'],EAS:['Pan Star','Camellia Line','Orient Overseas'],SEAS:['Pelni','Weesgo'],CARI:['Bahamas Ferries','Caribbean Ferry Co.'],NAW:['Clipper Vacations','BC Ferries'],RPLA:['Buquebus','Colonia Express'],TZ:['Azam Marine','Kilimanjaro Fast Ferries']};
+function operTren(a,b){
+  if(a.rail!=='EUR') return OPER[a.rail]||'Tren';
+  const gb=a.cc==='GB'||b.cc==='GB';
+  if(gb && a.cc!==b.cc) return 'Eurostar';
+  const x=OPER_EU[a.cc]||'Tren', y=OPER_EU[b.cc]||'Tren';
+  return a.cc===b.cc ? x : (x===y?x:x+' / '+y);
+}
+
+/* ---------- estimadores de duración (cota inferior exacta: la poda los usa antes de generar precios) ---------- */
+const RAIL={EUR:{v:150,pk:.115,max:2400},JPN:{v:210,pk:.17,max:1300},CHN:{v:220,pk:.075,max:2300},KOR:{v:190,pk:.12,max:500},IND:{v:80,pk:.035,max:1700},NAE:{v:90,pk:.15,max:1300},CAS:{v:80,pk:.12,max:300},AUS:{v:90,pk:.09,max:1000},ZAF:{v:60,pk:.05,max:1700},MAR:{v:110,pk:.09,max:700},EGY:{v:70,pk:.04,max:300},THA:{v:65,pk:.04,max:800},VNM:{v:55,pk:.05,max:1700}};
+const VEL_EU={FR:200,ES:170,DE:160,IT:180,BE:150,NL:140,GB:140,CH:130,AT:130,DK:130,SE:120,NO:110,PT:110,PL:110,TR:110,CZ:100,HU:100,HR:80,GR:80,EE:70,LV:70,FI:100,IE:90};
+const BASIN_MAX={MED:1700,NORD:1500,ATLC:1700,EAS:1500,SEAS:1700,CARI:1300,NAW:300,RPLA:300,TZ:100};
+
+function avionEst(a,b){
+  if(!a.air||!b.air) return null;
+  const d=km(a,b); if(d<150) return null;
+  let t=45+d/(d>3500?830:700)*60; if(d>CONFIG.ESCALA_KM) t+=150;
+  return Math.round(t);
+}
+function trenEst(a,b){
+  if(!a.rail||a.rail!==b.rail) return null;
+  const R=RAIL[a.rail], d=km(a,b); if(d>R.max||d<20) return null;
+  let t;
+  if(a.rail==='EUR'){
+    const gb=a.cc==='GB'||b.cc==='GB';
+    if(gb && a.cc!==b.cc && ['FR','BE','NL'].includes(a.cc==='GB'?b.cc:a.cc)) t=d*1.1/200*60+30;       // Eurostar
+    else{ const v=Math.min(VEL_EU[a.cc]||100,VEL_EU[b.cc]||100); t=d*1.15/v*60+12+(a.cc!==b.cc?25:0)+(gb?20:0); }
+  } else t=d*1.15/R.v*60+12;
+  t+=Math.floor(d/650)*18;                                  // transbordos en recorridos largos
+  return Math.round(t);
+}
+function barcoEst(a,b){                                     // barco directo: mismo puerto-cuenca
+  if(!a.port||a.port!==b.port) return null;
+  const d=km(a,b); if(d<10||d>BASIN_MAX[a.port]) return null;
+  return Math.round(50+d*1.15/38*60);
+}
+function rutaMixta(a,b){                                    // tren + barco cuando un extremo (solo uno) es interior
+  let best=null;
+  if(a.hubs.length && !a.port && b.port){
+    for(const h of a.hubs){ const H=BY[h]; if(H.id===b.id||H.port!==b.port) continue;
+      const t=trenEst(a,H), f=barcoEst(H,b); if(t==null||f==null) continue;
+      const tot=t+f+90; if(!best||tot<best.tot) best={hub:H,lado:'origen',t,f,tot}; }
+  }
+  if(b.hubs.length && !b.port && a.port){
+    for(const h of b.hubs){ const H=BY[h]; if(H.id===a.id||H.port!==a.port) continue;
+      const t=trenEst(H,b), f=barcoEst(a,H); if(t==null||f==null) continue;
+      const tot=t+f+60; if(!best||tot<best.tot) best={hub:H,lado:'destino',t,f,tot}; }
+  }
+  return best;
+}
+function minDur(a,b,modos){
+  const v=[];
+  if(modos.has('avion')) v.push(avionEst(a,b));
+  if(modos.has('tren')) v.push(trenEst(a,b));
+  if(modos.has('barco')){ v.push(barcoEst(a,b)); if(modos.has('tren')){ const R=rutaMixta(a,b); if(R) v.push(R.tot); } }
+  const x=v.filter(n=>n!=null); return x.length?Math.min(...x):null;
+}
+
+/* ---------- generación determinista de ofertas (adaptadores en modo demostración) ---------- */
+function lead(date,amp){
+  const d=diffDays(HOY,date), f=d<=2?1.5:d<=7?1.3:d<=14?1.15:d<=30?1:.93;
+  return 1+(f-1)*amp;
+}
+function segU(mode,a,b,dep,dur,price,carrier,code,nota){ return {mode,from:a.id,to:b.id,dep,arr:dep+dur*60000,dur,price:Math.max(5,Math.round(price)),carrier,code,nota:nota||''}; }
+function seg(mode,a,b,date,min,dur,price,carrier,code,nota){ return segU(mode,a,b,localToUtc(a.tz,date,min),dur,price,carrier,code,nota); }
+function oferta(segs){
+  const A=BY[segs[0].from], B=BY[segs[segs.length-1].to];
+  const dep=segs[0].dep, arr=segs[segs.length-1].arr;
+  return {segs,dep,arr,dur:Math.round((arr-dep)/60000),price:segs.reduce((s,x)=>s+x.price,0),
+    dl:utcToLocal(A.tz,dep),al:utcToLocal(B.tz,arr),modos:[...new Set(segs.map(s=>s.mode))],
+    id:segs.map(s=>s.mode[0]+s.dep).join('-'),from:A.id,to:B.id};
+}
+const pick=(r,arr)=>arr[Math.floor(r()*arr.length)];
+
+function genAvion(a,b,date){
+  const base=avionEst(a,b); if(base==null) return [];
+  const r=rng('A',a.id,b.id,date), d=km(a,b), n=3+Math.floor(r()*4);
+  const low=d<2800&&a.cont==='EU'&&b.cont==='EU', pool=carriers(a,b,low), out=[], used=new Set();
+  const dw=dow(date);
+  for(let i=0;i<n;i++){
+    const min=360+Math.floor(r()*200)*5; if(used.has(min)) continue; used.add(min);
+    const c=pick(r,pool), dur=Math.round(base*(1+r()*.06));
+    let p=d<1500?26+d*.075:d<5000?70+d*.05:160+d*.045;
+    if(low) p*=.72; if(d>CONFIG.ESCALA_KM) p*=.92;
+    p*=(.75+r()*.8)*lead(date,1)*((dw===5||dw===0)?1.1:(dw===2||dw===3)?.93:1)*((min<420||min>1260)?.9:1);
+    out.push(seg('avion',a,b,date,min,dur,p,c.n,c.c+' '+(100+Math.floor(r()*8800)),d>CONFIG.ESCALA_KM?'1 escala':'directo'));
+  }
+  return out;
+}
+function precioTren(a,b,r,date){
+  const R=RAIL[a.rail], d=km(a,b); let p=7+d*R.pk;
+  if(operTren(a,b)==='Eurostar') p*=1.35;
+  return p*(.7+r()*.9)*lead(date,.6);
+}
+function genTren(a,b,date){
+  const base=trenEst(a,b); if(base==null) return [];
+  const r=rng('T',a.id,b.id,date), d=km(a,b), n=d<150?8:d<400?7:d<800?5:3, op=operTren(a,b), out=[];
+  for(let i=0;i<n;i++){
+    let min=330+Math.round((i+r()*.8)/n*1000/5)*5, nota='';
+    if(d>900&&i===n-1){ min=1260+Math.floor(r()*24)*5; nota='nocturno'; }
+    const dur=Math.round(base*(1+r()*.05));
+    out.push(seg('tren',a,b,date,min,dur,precioTren(a,b,r,date),op,String(1000+Math.floor(r()*8999)),nota));
+  }
+  return out;
+}
+function genBarco(a,b,date){
+  const base=barcoEst(a,b); if(base==null) return [];
+  const d=km(a,b), k=[a.id,b.id].sort().join('');
+  if(d>250 && hash('op'+k+dow(date))%10<2) return [];       // no navega todos los días
+  const r=rng('B',a.id,b.id,date), op=pick(r,FERRY[a.port]||['Naviera']), out=[];
+  let slots;
+  if(d<120) slots=[7*60+30,10*60+30,14*60,17*60+30,20*60+30].slice(0,3+Math.floor(r()*3));
+  else if(d<500) slots=[8*60+Math.floor(r()*240), 18*60+Math.floor(r()*330)];
+  else slots=[r()<.5?10*60+Math.floor(r()*180):20*60+Math.floor(r()*180)];
+  for(const s of slots){
+    const min=Math.round(s/5)*5, dur=Math.round(base*(1+r()*.1)), noche=dur>360&&(min>=1020||min<=300);
+    const p=(14+d*.09)*(.8+r()*.7)*lead(date,.3)+(noche?28:0);
+    out.push(seg('barco',a,b,date,min,dur,p,op,'',noche?'butaca o cabina':'butaca'));
+  }
+  return out;
+}
+function genMixto(a,b,date){                                // tren hasta el puerto + barco (o al revés)
+  const R=rutaMixta(a,b); if(!R) return [];
+  const r=rng('M',a.id,b.id,date), H=R.hub, out=[];
+  if(R.lado==='origen'){
+    for(const dd of [date,addDays(date,1)]) for(const f of genBarco(H,b,dd)){
+      const slack=Math.floor(r()*30), tdur=R.t, tdep=f.dep-(90+slack)*60000-tdur*60000, dl=utcToLocal(a.tz,tdep);
+      if(dl.date!==date||dl.min<330) continue;
+      const tr=segU('tren',a,H,tdep,tdur,precioTren(a,H,r,date),operTren(a,H),String(1000+Math.floor(r()*8999)),'hasta el puerto');
+      out.push([tr,f]);
+    }
+  } else {
+    for(const f of genBarco(a,H,date)){
+      const slack=Math.floor(r()*30), tdep=f.arr+(60+slack)*60000, dl=utcToLocal(H.tz,tdep);
+      if(dl.min>1410&&dl.date!==utcToLocal(H.tz,f.arr).date) continue;
+      const tr=segU('tren',H,b,tdep,R.t,precioTren(H,b,r,date),operTren(H,b),String(1000+Math.floor(r()*8999)),'desde el puerto');
+      out.push([f,tr]);
+    }
+  }
+  return out;
+}
+/* Adaptadores intercambiables: en modo live bastaría sustituir `generar` por una llamada a PROXY_URL
+   que devuelva segmentos con el mismo formato (mode, from, to, dep, arr, dur, price, carrier, code, nota). */
+const ADAPT={
+  avion:{nombre:'Avión',estimar:avionEst,generar:genAvion},
+  tren :{nombre:'Tren', estimar:trenEst, generar:genTren},
+  barco:{nombre:'Barco',estimar:barcoEst,generar:genBarco}
+};
+const _lc=new Map();
+function legOffers(a,b,date,modos){
+  const key=a.id+b.id+date+[...modos].sort().join('');
+  let v=_lc.get(key); if(v) return v;
+  if(CONFIG.MODE==='live') throw new Error('Modo live sin adaptador: conecta PROXY_URL en ADAPT.*.generar');
+  v=[];
+  for(const m of ['avion','tren','barco']) if(modos.has(m)) for(const s of ADAPT[m].generar(a,b,date)) v.push(oferta([s]));
+  if(modos.has('tren')&&modos.has('barco')) for(const par of genMixto(a,b,date)) v.push(oferta(par));
+  v=v.filter(o=>o.dep>AHORA+3*3600e3);                      // nada que ya haya salido (o casi)
+  _lc.set(key,v); return v;
+}
+
+/* ---------- búsqueda ---------- */
+function construirPares(p){
+  const hi=addDays(HOY,CONFIG.VENTANA_DIAS), lo=addDays(HOY,1), pares=[];
+  const rango=(a,b)=>{const o=[];for(let d=a;d<=b;d=addDays(d,1))o.push(d);return o};
+  if(p.soloIda) return (p.ida.fijo?[p.ida.fecha]:rango(lo,hi)).map(d=>[d,null]);
+  if(p.ida.fijo&&p.vuelta.fijo) return [[p.ida.fecha,p.vuelta.fecha]];
+  const [e0,e1]=p.estancia;
+  if(p.ida.fijo){ for(let n=e0;n<=e1;n++) pares.push([p.ida.fecha,addDays(p.ida.fecha,n)]); }
+  else if(p.vuelta.fijo){ for(let n=e0;n<=e1;n++){ const i=addDays(p.vuelta.fecha,-n); if(i>=HOY) pares.push([i,p.vuelta.fecha]); } }
+  else for(const i of rango(lo,hi)) for(let n=e0;n<=e1;n++) pares.push([i,addDays(i,n)]);
+  return pares;
+}
+function filtroTramo(h,maxDur){                             // h = {sale, llega}: minutos o null
+  return o=>(!maxDur||o.dur<=maxDur)&&(h.sale==null||o.dl.min>=h.sale)&&(h.llega==null||(o.al.date===o.dl.date&&o.al.min<=h.llega));
+}
+function seleccionar(res,topN,maxPais){
+  const cmp=(x,y)=>x.total-y.total||x.dest.name.localeCompare(y.dest.name,'es');
+  res.sort(cmp);
+  const out=[],cnt={},resto=[];
+  for(const r of res){ if(out.length>=topN) break; const c=cnt[r.dest.cc]||0; if(c<maxPais){out.push(r);cnt[r.dest.cc]=c+1;} else resto.push(r); }
+  for(const r of resto){ if(out.length>=topN) break; out.push(r); }
+  return out.sort(cmp);
+}
+async function buscar(p,onProg){
+  const O=BY[p.origen], modos=p.modos, maxDur=p.maxDur||null;
+  let cand=PLACES.filter(x=>x.id!==O.id);
+  if(p.destino) cand=cand.filter(x=>x.id===p.destino);
+  else if(p.zona&&p.zona!=='*') cand=cand.filter(x=>x.cont===p.zona);
+  const pares=construirPares(p);
+  // 1) poda por duración ANTES de generar ningún precio
+  const viables=[]; let podados=0, sinRuta=0;
+  for(const X of cand){
+    const m=minDur(O,X,modos);
+    if(m==null){ sinRuta++; continue; }
+    if(maxDur&&m>maxDur){ podados++; continue; }
+    viables.push(X);
+  }
+  const fi=filtroTramo({sale:p.ida.sale,llega:p.ida.llega},maxDur), fv=filtroTramo({sale:p.vuelta.sale,llega:p.vuelta.llega},maxDur);
+  const res=[]; let hechos=0;
+  for(const X of viables){
+    const ci={},cv={};
+    const gi=d=>ci[d]||(ci[d]=legOffers(O,X,d,modos).filter(fi).sort((a,b)=>a.price-b.price));
+    const gv=d=>cv[d]||(cv[d]=legOffers(X,O,d,modos).filter(fv).sort((a,b)=>a.price-b.price));
+    const combos=[];
+    for(const [i,v] of pares){
+      const A=gi(i); if(!A.length) continue;
+      if(v==null){ for(const o of A.slice(0,3)) combos.push({ida:o,vuelta:null,total:o.price,i,v:null}); continue; }
+      const B=gv(v); if(!B.length) continue;
+      let n=0;
+      outer: for(const o of A) for(const q of B){
+        if(q.dep>=o.arr+90*60000){ combos.push({ida:o,vuelta:q,total:o.price+q.price,i,v}); if(++n>=3) break outer; }
+      }
+    }
+    if(combos.length){
+      combos.sort((x,y)=>x.total-y.total);
+      const seen=new Set(), porPar={}, lista=[];
+      for(const c of combos){
+        const k=c.ida.id+'>'+(c.vuelta?c.vuelta.id:''); if(seen.has(k)) continue; seen.add(k);
+        const kp=c.i+'|'+c.v; if((porPar[kp]||0)>=2) continue; porPar[kp]=(porPar[kp]||0)+1;
+        lista.push(c); if(lista.length>CONFIG.ALTERNATIVAS) break;
+      }
+      res.push({dest:X,total:lista[0].total,best:lista[0],alts:lista.slice(1)});
+    }
+    if(++hechos%8===0){ onProg&&onProg(hechos/viables.length); await new Promise(r=>setTimeout(r,0)); }
+  }
+  onProg&&onProg(1);
+  return {resultados:seleccionar(res,CONFIG.TOP_N,CONFIG.MAX_POR_PAIS),stats:{evaluados:cand.length,podados,sinRuta,validos:res.length,pares:pares.length}};
+}
+
+/* ---------- búsqueda tolerante en el catálogo ---------- */
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){ const cur=[i]; for(let j=1;j<=n;j++) cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1)); prev=cur; }
+  return prev[n];
+}
+function buscarLugares(q,max=10){
+  q=norm(q); if(!q) return [];
+  const out=[];
+  for(const p of PLACES){
+    let s=0;
+    for(const k of p.k){
+      if(k===q) s=Math.max(s,100);
+      else if(k.startsWith(q)) s=Math.max(s,85);
+      else if(k.split(/[\s\-']+/).some(t=>t.startsWith(q))) s=Math.max(s,65);
+      else if(k.includes(q)) s=Math.max(s,45);
+      else if(q.length>=3){
+        const tol=q.length>=7?2:1;
+        if(lev(q,k.slice(0,q.length))<=tol||k.split(/\s+/).some(t=>lev(q,t.slice(0,q.length))<=tol)) s=Math.max(s,28);
+      }
+    }
+    if(p.kp.startsWith(q)) s=Math.max(s,38);
+    if(s>0) out.push({p,s});
+  }
+  return out.sort((a,b)=>b.s-a.s||a.p.name.localeCompare(b.p.name,'es')).slice(0,max).map(x=>x.p);
+}
+/* ===== FIN MOTOR ===== */
+
+/* =====================================================================
+   INTERFAZ
+   ===================================================================== */
+if(typeof document!=='undefined'){
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ICO={
+  avion:'<svg class="ico avion" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V8l-8 5v2l8-2.5V18l-2 1.5V21l3.5-1 3.5 1v-1.5L13 18v-5.5z"/></svg>',
+  tren:'<svg class="ico tren" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M6 3h12a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3l1.5 2.5h-2L15 18H9l-1.5 2.5h-2L7 18a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2zm0 2v5h12V5zm1.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>',
+  barco:'<svg class="ico barco" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15l2 5h14l2-5-9-2.5z"/><path d="M7 11h10v3.2l-5-1.4-5 1.4zM10 5h4v5h-4z"/></svg>'
+};
+const MODO_TXT={avion:'Avión',tren:'Tren',barco:'Barco'};
+const POPULARES=['MAD','BCN','LON','PAR','ROM','LIS','NYC','TYO','SCQ'];
+
+/* ---------- formato ---------- */
+const hm=m=>pad(Math.floor(m/60))+':'+pad(m%60);
+const fFecha=s=>new Intl.DateTimeFormat('es-ES',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(s+'T00:00:00Z')).replace(',','').replace(/\./g,'');
+const fFechaL=s=>new Intl.DateTimeFormat('es-ES',{day:'numeric',month:'long',timeZone:'UTC'}).format(new Date(s+'T00:00:00Z'));
+function fDur(m){ const h=Math.floor(m/60),mm=m%60; if(h>=48) return Math.floor(h/24)+' d '+(h%24)+' h'; return h?h+' h '+pad(mm):mm+' min'; }
+
+/* ---------- combobox propio ---------- */
+function Combo(host,{any,placeholder,onChange}){
+  host.innerHTML='<input type="text" role="combobox" aria-expanded="false" aria-autocomplete="list" spellcheck="false" autocapitalize="off"><ul role="listbox" hidden></ul>';
+  const inp=host.querySelector('input'), ul=host.querySelector('ul');
+  inp.id=host.id+'In'; inp.placeholder=placeholder||'';
+  let value=null, items=[], hi=0, abierto=false;
+  const etiqueta=id=>id?BY[id].name:(any||'');
+  function lista(q){
+    let l;
+    if(q.trim()) l=buscarLugares(q); else l=POPULARES.map(i=>BY[i]);
+    items=(any?[{id:null,name:any,any:true}]:[]).concat(l);
+    if(q.trim()&&!l.length) items=any?items:[];
+    hi=q.trim()&&l.length?(any?1:0):0;
+  }
+  function pinta(){
+    ul.innerHTML=items.length?items.map((it,i)=>it.any?
+      `<li role="option" class="any${i===hi?' on':''}" data-i="${i}"><span>${esc(it.name)}</span><small>sin fijar</small></li>`:
+      `<li role="option" class="${i===hi?'on':''}" data-i="${i}"><span>${esc(it.name)}</span><small>${esc(it.pais)} · ${it.id}</small></li>`).join('')
+      :'<li class="vacio">Ese sitio no está en el catálogo</li>';
+    ul.hidden=false; inp.setAttribute('aria-expanded','true'); abierto=true;
+  }
+  function cierra(){ ul.hidden=true; inp.setAttribute('aria-expanded','false'); abierto=false; }
+  function elige(it){ value=it.any?null:it.id; inp.value=etiqueta(value); cierra(); onChange&&onChange(value); }
+  inp.addEventListener('focus',()=>{ inp.select(); lista(''); pinta(); });
+  inp.addEventListener('input',()=>{ lista(inp.value); pinta(); });
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(!abierto){lista(inp.value);} hi=Math.min(items.length-1,hi+1); pinta(); ul.querySelector('.on')?.scrollIntoView({block:'nearest'}); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); hi=Math.max(0,hi-1); pinta(); ul.querySelector('.on')?.scrollIntoView({block:'nearest'}); }
+    else if(e.key==='Enter'&&abierto&&items[hi]){ e.preventDefault(); elige(items[hi]); }
+    else if(e.key==='Escape'){ inp.value=etiqueta(value); cierra(); }
+  });
+  ul.addEventListener('mousedown',e=>{ const li=e.target.closest('li[data-i]'); if(li){ e.preventDefault(); elige(items[+li.dataset.i]); } });
+  inp.addEventListener('blur',()=>{
+    if(abierto){ const t=inp.value.trim(); if(t&&items[hi]&&!items[hi].any&&norm(inp.value)!==norm(etiqueta(value))) elige(items[hi]); else if(!t&&any) elige({any:true,name:any}); else inp.value=etiqueta(value); cierra(); }
+  });
+  return { get value(){return value}, set(id){ value=id; inp.value=etiqueta(id); } };
+}
+
+/* ---------- estado del formulario ---------- */
+const S={ida:'fecha',vuelta:'fecha'};
+const origen=Combo($('#origen'),{placeholder:'¿Desde dónde sales?',onChange:guarda});
+const destino=Combo($('#destino'),{any:'Cualquier lugar',placeholder:'¿Adónde?',onChange:()=>{ muestra(); guarda(); }});
+
+function horas(sel,vacio){
+  sel.innerHTML='<option value="">'+vacio+'</option>'+Array.from({length:48},(_,i)=>`<option value="${i*30}">${hm(i*30)}</option>`).join('');
+}
+horas($('#idaSale'),'Cualquier hora'); horas($('#vSale'),'Cualquier hora');
+horas($('#idaLlega'),'Cualquier hora'); horas($('#vLlega'),'Cualquier hora');
+
+function muestra(){
+  const solo=$('#soloIda').checked;
+  $('#bVuelta').classList.toggle('off',solo);
+  $$('#bVuelta input,#bVuelta select,#bVuelta button').forEach(x=>x.disabled=solo);
+  $('#idaFecha').disabled=S.ida!=='fecha'; $('#vFecha').disabled=solo||S.vuelta!=='fecha';
+  $('#zonaBox').style.visibility=destino.value?'hidden':'visible';
+  $('#estBox').style.visibility=(!solo&&(S.ida==='any'||S.vuelta==='any'))?'visible':'hidden';
+  for(const g of ['ida','vuelta']) $$(`.seg[data-grp=${g}] button`).forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===S[g]));
+}
+$$('.seg button').forEach(b=>b.addEventListener('click',()=>{ S[b.parentNode.dataset.grp]=b.dataset.m; muestra(); guarda(); }));
+$('#soloIda').addEventListener('change',()=>{ muestra(); guarda(); });
+$$('#f select,#f input[type=date],#f input[name=modo]').forEach(x=>x.addEventListener('change',guarda));
+
+function guarda(){
+  try{ localStorage.setItem('franja:v1',JSON.stringify({o:origen.value,d:destino.value,ida:S.ida,vu:S.vuelta,
+    s:$('#soloIda').checked,z:$('#zona').value,m:$('#maxDur').value,e:$('#estancia').value,
+    h:[$('#idaSale').value,$('#idaLlega').value,$('#vSale').value,$('#vLlega').value],
+    modos:$$('input[name=modo]:checked').map(i=>i.value),fi:$('#idaFecha').value,fv:$('#vFecha').value})); }catch(e){}
+}
+function porDefecto(){
+  // ida: el próximo viernes (mínimo dentro de 3 días); vuelta: el domingo siguiente
+  let d=addDays(HOY,3); while(dow(d)!==5) d=addDays(d,1);
+  origen.set('MAD'); destino.set(null);
+  $('#idaFecha').value=d; $('#vFecha').value=addDays(d,2);
+  $('#idaSale').value='1080'; $('#vLlega').value='1320';
+}
+function restaura(){
+  porDefecto();
+  try{
+    const g=JSON.parse(localStorage.getItem('franja:v1')||'null'); if(!g) return;
+    if(g.o&&BY[g.o]) origen.set(g.o); if(g.d&&BY[g.d]) destino.set(g.d);
+    S.ida=g.ida||'fecha'; S.vuelta=g.vu||'fecha'; $('#soloIda').checked=!!g.s;
+    $('#zona').value=g.z||'*'; $('#maxDur').value=g.m||''; $('#estancia').value=g.e||'1-14';
+    const ids=['#idaSale','#idaLlega','#vSale','#vLlega']; (g.h||[]).forEach((v,i)=>$(ids[i]).value=v);
+    if(g.modos&&g.modos.length) $$('input[name=modo]').forEach(i=>i.checked=g.modos.includes(i.value));
+    if(g.fi&&g.fi>=HOY) $('#idaFecha').value=g.fi; if(g.fv&&g.fv>=HOY) $('#vFecha').value=g.fv;
+  }catch(e){}
+}
+$('#idaFecha').min=$('#vFecha').min=HOY;
+restaura(); muestra();
+$('#demo').hidden=CONFIG.MODE!=='mock';
+$('#idaFecha').addEventListener('change',()=>{ if($('#vFecha').value<$('#idaFecha').value) $('#vFecha').value=$('#idaFecha').value; });
+
+/* ---------- lectura y validación ---------- */
+const mins=v=>v===''?null:+v;
+function leer(){
+  const solo=$('#soloIda').checked;
+  const p={
+    origen:origen.value, destino:destino.value, zona:$('#zona').value, soloIda:solo,
+    modos:new Set($$('input[name=modo]:checked').map(i=>i.value)),
+    maxDur:$('#maxDur').value?+$('#maxDur').value:null,
+    estancia:$('#estancia').value.split('-').map(Number),
+    ida:{fijo:S.ida==='fecha',fecha:$('#idaFecha').value,sale:mins($('#idaSale').value),llega:mins($('#idaLlega').value)},
+    vuelta:{fijo:S.vuelta==='fecha',fecha:$('#vFecha').value,sale:mins($('#vSale').value),llega:mins($('#vLlega').value)}
+  };
+  let err='';
+  if(!p.origen) err='Falta el origen: es lo único que no puede ser flexible.';
+  else if(!p.modos.size) err='Elige al menos un medio de transporte.';
+  else if(p.ida.fijo&&!p.ida.fecha) err='Pon la fecha de ida o elige «Cualquier día».';
+  else if(p.ida.fijo&&p.ida.fecha<HOY) err='La fecha de ida ya pasó.';
+  else if(!solo&&p.vuelta.fijo&&!p.vuelta.fecha) err='Pon la fecha de vuelta, elige «Cualquier día» o marca «Solo ida».';
+  else if(!solo&&p.ida.fijo&&p.vuelta.fijo&&p.vuelta.fecha<p.ida.fecha) err='La vuelta no puede ser antes que la ida.';
+  else if(!solo&&!p.ida.fijo&&p.vuelta.fijo&&p.vuelta.fecha<=HOY) err='Con ida flexible, la vuelta tiene que ser en el futuro.';
+  return {p,err};
+}
+
+/* ---------- pintado de resultados ---------- */
+function resumen(p){
+  const O=BY[p.origen], D=p.destino?BY[p.destino].name:(p.zona!=='*'?'cualquier lugar de '+$('#zona').selectedOptions[0].textContent:'cualquier lugar');
+  const tr=(t,x)=>{ const a=[]; a.push(x.fijo?fFechaL(x.fecha):'cualquier día'); if(x.sale!=null)a.push('desde las '+hm(x.sale)); if(x.llega!=null)a.push('llegando antes de las '+hm(x.llega)); return t+' '+a.join(', '); };
+  return {titulo:`${O.name} → ${D}`, detalle:[tr('Ida',p.ida),p.soloIda?'solo ida':tr('vuelta',p.vuelta),p.maxDur?'máx. '+fDur(p.maxDur)+' por trayecto':'sin límite de duración',[...p.modos].map(m=>MODO_TXT[m].toLowerCase()).join(' · ')]};
+}
+function modosIco(o){ return o.modos.map(m=>ICO[m]).join(''); }
+function nombreModos(o){ return o.modos.map(m=>MODO_TXT[m]).join(' + '); }
+function tramoHTML(et,o){
+  const A=BY[o.from],B=BY[o.to], dd=diffDays(o.dl.date,o.al.date);
+  const distinto=o.dl.off!==o.al.off;
+  const cadena=o.segs.length>1
+    ? o.segs.map(s=>`<span class="m">${ICO[s.mode]}${MODO_TXT[s.mode]}</span>${esc(BY[s.from].name)} ${hm(utcToLocal(BY[s.from].tz,s.dep).min)} → ${esc(BY[s.to].name)} ${hm(utcToLocal(BY[s.to].tz,s.arr).min)} · ${esc(s.carrier)}`).join('<br>')
+    : (()=>{ const s=o.segs[0]; return `<span class="m ${s.mode}">${ICO[s.mode]}${MODO_TXT[s.mode]}</span>${esc(s.carrier)}${s.code?' '+esc(s.code):''} · ${esc(s.nota)}`; })();
+  return `<div class="tr">
+    <span class="et">${et}</span>
+    <span class="fe">${fFecha(o.dl.date)}</span>
+    <span class="hh" title="Horas locales de cada ciudad"><b>${hm(o.dl.min)}</b><i>${A.id}</i><span class="fl">→</span><b>${hm(o.al.min)}</b><i>${B.id}</i>${dd?`<sup>+${dd}</sup>`:''}${distinto?'<i title="Cambio de huso horario">· huso</i>':''}</span>
+    <span class="du">${fDur(o.dur)}</span>
+    <span class="dd">${cadena}</span>
+  </div>`;
+}
+function enlaces(c){
+  const ms=new Set([...c.ida.modos,...(c.vuelta?c.vuelta.modos:[])]);
+  return [...ms].map(m=>`<a href="${CONFIG.ENLACES[m][1]}" target="_blank" rel="noopener noreferrer">${MODO_TXT[m]} · ${CONFIG.ENLACES[m][0]} ↗</a>`).join('');
+}
+function altHTML(c,best){
+  const delta=c.total-best.total;
+  const mini=(o)=>`${fFecha(o.dl.date)} · <b>${hm(o.dl.min)}</b>→<b>${hm(o.al.min)}</b><span class="ic">${modosIco(o)}</span><span class="s">${fDur(o.dur)} · ${esc(o.segs.map(s=>s.carrier).filter((x,i,a)=>a.indexOf(x)===i).join(' + '))}</span>`;
+  return `<div class="alt"><div><span class="s">${c.vuelta?'IDA + VUELTA':'SOLO IDA'}</span></div><div>${mini(c.ida)}</div><div>${c.vuelta?mini(c.vuelta):''}</div><div class="p">${c.total} €<small>${delta>0?'+'+delta+' €':'igual'}</small></div></div>`;
+}
+function billete(r,i,p){
+  const b=r.best, D=r.dest;
+  const alts=r.alts.length?`<details class="alts"><summary>${r.alts.length} combinaci${r.alts.length>1?'ones':'ón'} más</summary><div class="altlist">${r.alts.map(a=>altHTML(a,b)).join('')}</div></details>`:'<span class="pais">sin más combinaciones que cumplan</span>';
+  return `<article class="billete">
+    <div class="stub"><span class="n">Nº ${pad(i+1)}</span>
+      <div><div class="precio">${b.total}<sup>€</sup></div><div class="nota">${b.vuelta?'ida y vuelta':'solo ida'} · por persona</div></div></div>
+    <div class="cuerpo">
+      <div class="dest"><h3>${esc(D.name)}</h3><span class="pais">${esc(D.pais)}</span><span class="cod">${D.id}</span></div>
+      ${tramoHTML('IDA',b.ida)}${b.vuelta?tramoHTML('VUELTA',b.vuelta):''}
+      <div class="pie">${alts}<div class="enl">${enlaces(b)}</div></div>
+    </div></article>`;
+}
+function pinta(out,p){
+  const R=resumen(p), s=out.stats, n=out.resultados.length;
+  const meta=`<b>${s.evaluados}</b> destinos evaluados · <b>${s.podados}</b> descartados por duración antes de calcular precios${s.sinRuta?` · <b>${s.sinRuta}</b> sin ruta con esos medios`:''} · <b>${s.validos}</b> con combinación válida`;
+  if(!n){
+    $('#res').innerHTML=`<div class="cabres"><h2>${esc(R.titulo)}</h2></div><div class="vacio-res"><h3>Nada cabe en esa franja</h3>
+      <p class="meta">${meta}</p><ul><li>Relaja una hora: «llego antes de» suele ser la que más descarta.</li><li>Sube la duración máxima o quítala.</li><li>Pasa alguna fecha a «Cualquier día».</li><li>Activa más medios: el tren y el barco solo existen donde hay vías o puertos.</li></ul></div>`;
+    return;
+  }
+  $('#res').innerHTML=`<div class="cabres"><div><h2>${n===1&&p.destino?'':'Los '+n+' más baratos · '}<em>${esc(R.titulo)}</em></h2>
+    <p class="meta" style="margin-top:10px">${R.detalle.map(esc).join(' &nbsp;/&nbsp; ')}</p></div><p class="meta">${meta}.<br>${s.validos>n?`Mostrando ${n}, con tope de ${CONFIG.MAX_POR_PAIS} por país para que haya variedad. `:''}Orden: precio total, de menor a mayor.</p></div>`
+    +out.resultados.map((r,i)=>billete(r,i,p)).join('');
+}
+
+/* ---------- envío ---------- */
+$('#f').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const {p,err}=leer(); $('#aviso').textContent=err;
+  if(err) return;
+  guarda(); AHORA=Date.now();
+  const btn=$('#buscar'); btn.disabled=true; btn.textContent='Calculando…';
+  $('#res').innerHTML='<div class="progtxt" id="pt">Podando destinos por duración…</div><div class="prog"><div id="pb"></div></div>';
+  $('#res').scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const out=await buscar(p,f=>{ const b=$('#pb'); if(b){ b.style.width=Math.round(f*100)+'%'; $('#pt').textContent='Generando franjas… '+Math.round(f*100)+' %'; } });
+    pinta(out,p);
+  }catch(ex){ $('#res').innerHTML='<div class="vacio-res"><h3>Algo ha petado</h3><p class="meta">'+esc(ex.message)+'</p></div>'; }
+  btn.disabled=false; btn.textContent='Buscar franja →';
+});
+}
+
+/* Service worker: solo en la web (no dentro de la app Android) para que funcione sin conexión */
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && location.hostname!=='localhost' && !window.Capacitor){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

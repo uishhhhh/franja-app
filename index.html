@@ -41,6 +41,7 @@ main{padding-bottom:70px}
 .fila{display:grid;gap:18px;margin-bottom:22px}
 .fila.f3{grid-template-columns:1.3fr 1.3fr .8fr}
 .fila.f2{grid-template-columns:1fr 1fr;gap:26px}
+.zsub{margin-top:14px}
 .fila.f4{grid-template-columns:1fr 1fr 1.6fr;align-items:end}
 .lab{display:block;font:700 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
 input[type=text],input[type=date],select{
@@ -174,21 +175,26 @@ footer b{color:var(--ink)}
 <header class="cab">
   <div class="wrap">
     <h1>Franja<small>A TU HORA · AVIÓN / TREN / BARCO · TODO EL MUNDO</small></h1>
-    <p class="lema">Fijas el origen y tu <b>franja</b>. El destino, que lo busque otro.</p>
+    <p class="lema">Fijas tu <b>franja</b>. Origen y destino, si quieres, que los busque otro.</p>
   </div>
 </header>
 
 <main class="wrap">
 
 <form class="mesa" id="f" autocomplete="off" novalidate>
-  <div class="fila f3">
-    <div><label class="lab" for="origenIn">Origen (fijo)</label><div class="combo" id="origen"></div></div>
-    <div><label class="lab" for="destinoIn">Destino</label><div class="combo" id="destino"></div></div>
-    <div id="zonaBox"><label class="lab" for="zona">Zona</label>
-      <select id="zona">
-        <option value="*">Todo el mundo</option><option value="EU">Europa</option><option value="AF">África</option>
-        <option value="AS">Asia y Oriente Medio</option><option value="AM">América</option><option value="OC">Oceanía</option>
-      </select></div>
+  <div class="fila f2">
+    <div><label class="lab" for="origenIn">Origen</label><div class="combo" id="origen"></div>
+      <div id="zonaOBox" class="zsub"><label class="lab" for="zonaO">Zona de origen</label>
+        <select id="zonaO">
+          <option value="*">Todo el mundo</option><option value="EU">Europa</option><option value="AF">África</option>
+          <option value="AS">Asia y Oriente Medio</option><option value="AM">América</option><option value="OC">Oceanía</option>
+        </select></div></div>
+    <div><label class="lab" for="destinoIn">Destino</label><div class="combo" id="destino"></div>
+      <div id="zonaBox" class="zsub"><label class="lab" for="zona">Zona de destino</label>
+        <select id="zona">
+          <option value="*">Todo el mundo</option><option value="EU">Europa</option><option value="AF">África</option>
+          <option value="AS">Asia y Oriente Medio</option><option value="AM">América</option><option value="OC">Oceanía</option>
+        </select></div></div>
   </div>
 
   <div class="fila f2">
@@ -256,7 +262,7 @@ const CONFIG = {
   MODE: 'mock',        // 'mock' | 'live'
   PROXY_URL: '',       // en live: URL del proxy (p. ej. un Cloudflare Worker) que guarda las credenciales
   TOP_N: 50,           // destinos mostrados como máximo
-  MAX_POR_PAIS: 3,     // variedad: tope por país antes de rellenar
+  MAX_POR_PAIS: 3, MAX_PARES:500,     // variedad: tope por país antes de rellenar
   VENTANA_DIAS: 30,    // ventana de "cualquier día"
   ALTERNATIVAS: 6,     // combinaciones extra por destino
   ESCALA_KM: 9500,     // por encima, el vuelo lleva escala
@@ -646,31 +652,42 @@ function construirPares(p){
 function filtroTramo(h,maxDur){                             // h = {sale, llega}: minutos o null
   return o=>(!maxDur||o.dur<=maxDur)&&(h.sale==null||o.dl.min>=h.sale)&&(h.llega==null||(o.al.date===o.dl.date&&o.al.min<=h.llega));
 }
-function seleccionar(res,topN,maxPais){
-  const cmp=(x,y)=>x.total-y.total||x.dest.name.localeCompare(y.dest.name,'es');
+function seleccionar(res,topN,maxPais,clave){
+  const cmp=(x,y)=>x.total-y.total||x.dest.name.localeCompare(y.dest.name,'es')||x.orig.name.localeCompare(y.orig.name,'es');
   res.sort(cmp);
   const out=[],cnt={},resto=[];
-  for(const r of res){ if(out.length>=topN) break; const c=cnt[r.dest.cc]||0; if(c<maxPais){out.push(r);cnt[r.dest.cc]=c+1;} else resto.push(r); }
+  for(const r of res){ if(out.length>=topN) break; const k=clave(r), c=cnt[k]||0; if(c<maxPais){out.push(r);cnt[k]=c+1;} else resto.push(r); }
   for(const r of resto){ if(out.length>=topN) break; out.push(r); }
   return out.sort(cmp);
 }
 async function buscar(p,onProg){
-  const O=BY[p.origen], modos=p.modos, maxDur=p.maxDur||null;
-  let cand=PLACES.filter(x=>x.id!==O.id);
-  if(p.destino) cand=cand.filter(x=>x.id===p.destino);
-  else if(p.zona&&p.zona!=='*') cand=cand.filter(x=>x.cont===p.zona);
+  const modos=p.modos, maxDur=p.maxDur||null;
+  // orígenes: uno fijo, o todos los de la zona elegida
+  let origs=p.origen?[BY[p.origen]]:PLACES.filter(x=>!p.zonaO||p.zonaO==='*'||x.cont===p.zonaO);
+  let dests=PLACES;
+  if(p.destino) dests=dests.filter(x=>x.id===p.destino);
+  else if(p.zona&&p.zona!=='*') dests=dests.filter(x=>x.cont===p.zona);
   const pares=construirPares(p);
   // 1) poda por duración ANTES de generar ningún precio
-  const viables=[]; let podados=0, sinRuta=0;
-  for(const X of cand){
+  let viables=[]; let podados=0, sinRuta=0, evaluados=0;
+  for(const O of origs) for(const X of dests){
+    if(X.id===O.id) continue;
+    evaluados++;
     const m=minDur(O,X,modos);
     if(m==null){ sinRuta++; continue; }
     if(maxDur&&m>maxDur){ podados++; continue; }
-    viables.push(X);
+    viables.push({O,X,m});
+  }
+  // origen y destino libres a la vez: miles de pares; se evalúan los más cercanos (los baratos suelen serlo)
+  let recortado=0;
+  if(!p.origen&&!p.destino&&viables.length>CONFIG.MAX_PARES){
+    recortado=viables.length-CONFIG.MAX_PARES;
+    viables.sort((a,b)=>a.m-b.m||a.O.id.localeCompare(b.O.id)||a.X.id.localeCompare(b.X.id));
+    viables=viables.slice(0,CONFIG.MAX_PARES);
   }
   const fi=filtroTramo({sale:p.ida.sale,llega:p.ida.llega},maxDur), fv=filtroTramo({sale:p.vuelta.sale,llega:p.vuelta.llega},maxDur);
   const res=[]; let hechos=0;
-  for(const X of viables){
+  for(const {O,X} of viables){
     const ci={},cv={};
     const gi=d=>ci[d]||(ci[d]=legOffers(O,X,d,modos).filter(fi).sort((a,b)=>a.price-b.price));
     const gv=d=>cv[d]||(cv[d]=legOffers(X,O,d,modos).filter(fv).sort((a,b)=>a.price-b.price));
@@ -692,12 +709,13 @@ async function buscar(p,onProg){
         const kp=c.i+'|'+c.v; if((porPar[kp]||0)>=2) continue; porPar[kp]=(porPar[kp]||0)+1;
         lista.push(c); if(lista.length>CONFIG.ALTERNATIVAS) break;
       }
-      res.push({dest:X,total:lista[0].total,best:lista[0],alts:lista.slice(1)});
+      res.push({orig:O,dest:X,total:lista[0].total,best:lista[0],alts:lista.slice(1)});
     }
     if(++hechos%8===0){ onProg&&onProg(hechos/viables.length); await new Promise(r=>setTimeout(r,0)); }
   }
   onProg&&onProg(1);
-  return {resultados:seleccionar(res,CONFIG.TOP_N,CONFIG.MAX_POR_PAIS),stats:{evaluados:cand.length,podados,sinRuta,validos:res.length,pares:pares.length}};
+  const clave=r=>p.origen?r.dest.cc:(p.destino?r.orig.cc:r.orig.cc+'>'+r.dest.cc);
+  return {resultados:seleccionar(res,CONFIG.TOP_N,CONFIG.MAX_POR_PAIS,clave),stats:{evaluados,podados,sinRuta,validos:res.length,pares:pares.length,recortado}};
 }
 
 /* ---------- búsqueda tolerante en el catálogo ---------- */
@@ -789,7 +807,7 @@ function Combo(host,{any,placeholder,onChange}){
 
 /* ---------- estado del formulario ---------- */
 const S={ida:'fecha',vuelta:'fecha'};
-const origen=Combo($('#origen'),{placeholder:'¿Desde dónde sales?',onChange:guarda});
+const origen=Combo($('#origen'),{any:'Cualquier lugar',placeholder:'¿Desde dónde sales?',onChange:()=>{ muestra(); guarda(); }});
 const destino=Combo($('#destino'),{any:'Cualquier lugar',placeholder:'¿Adónde?',onChange:()=>{ muestra(); guarda(); }});
 
 function horas(sel,vacio){
@@ -804,6 +822,7 @@ function muestra(){
   $$('#bVuelta input,#bVuelta select,#bVuelta button').forEach(x=>x.disabled=solo);
   $('#idaFecha').disabled=S.ida!=='fecha'; $('#vFecha').disabled=solo||S.vuelta!=='fecha';
   $('#zonaBox').style.visibility=destino.value?'hidden':'visible';
+  $('#zonaOBox').style.visibility=origen.value?'hidden':'visible';
   $('#estBox').style.visibility=(!solo&&(S.ida==='any'||S.vuelta==='any'))?'visible':'hidden';
   for(const g of ['ida','vuelta']) $$(`.seg[data-grp=${g}] button`).forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===S[g]));
 }
@@ -813,7 +832,7 @@ $$('#f select,#f input[type=date],#f input[name=modo]').forEach(x=>x.addEventLis
 
 function guarda(){
   try{ localStorage.setItem('franja:v1',JSON.stringify({o:origen.value,d:destino.value,ida:S.ida,vu:S.vuelta,
-    s:$('#soloIda').checked,z:$('#zona').value,m:$('#maxDur').value,e:$('#estancia').value,
+    s:$('#soloIda').checked,z:$('#zona').value,zo:$('#zonaO').value,m:$('#maxDur').value,e:$('#estancia').value,
     h:[$('#idaSale').value,$('#idaLlega').value,$('#vSale').value,$('#vLlega').value],
     modos:$$('input[name=modo]:checked').map(i=>i.value),fi:$('#idaFecha').value,fv:$('#vFecha').value})); }catch(e){}
 }
@@ -828,9 +847,10 @@ function restaura(){
   porDefecto();
   try{
     const g=JSON.parse(localStorage.getItem('franja:v1')||'null'); if(!g) return;
-    if(g.o&&BY[g.o]) origen.set(g.o); if(g.d&&BY[g.d]) destino.set(g.d);
+    if(g.o===null) origen.set(null); else if(g.o&&BY[g.o]) origen.set(g.o);
+    if(g.d&&BY[g.d]) destino.set(g.d);
     S.ida=g.ida||'fecha'; S.vuelta=g.vu||'fecha'; $('#soloIda').checked=!!g.s;
-    $('#zona').value=g.z||'*'; $('#maxDur').value=g.m||''; $('#estancia').value=g.e||'1-14';
+    $('#zona').value=g.z||'*'; $('#zonaO').value=g.zo||'*'; $('#maxDur').value=g.m||''; $('#estancia').value=g.e||'1-14';
     const ids=['#idaSale','#idaLlega','#vSale','#vLlega']; (g.h||[]).forEach((v,i)=>$(ids[i]).value=v);
     if(g.modos&&g.modos.length) $$('input[name=modo]').forEach(i=>i.checked=g.modos.includes(i.value));
     if(g.fi&&g.fi>=HOY) $('#idaFecha').value=g.fi; if(g.fv&&g.fv>=HOY) $('#vFecha').value=g.fv;
@@ -846,7 +866,7 @@ const mins=v=>v===''?null:+v;
 function leer(){
   const solo=$('#soloIda').checked;
   const p={
-    origen:origen.value, destino:destino.value, zona:$('#zona').value, soloIda:solo,
+    origen:origen.value, destino:destino.value, zona:$('#zona').value, zonaO:$('#zonaO').value, soloIda:solo,
     modos:new Set($$('input[name=modo]:checked').map(i=>i.value)),
     maxDur:$('#maxDur').value?+$('#maxDur').value:null,
     estancia:$('#estancia').value.split('-').map(Number),
@@ -854,8 +874,7 @@ function leer(){
     vuelta:{fijo:S.vuelta==='fecha',fecha:$('#vFecha').value,sale:mins($('#vSale').value),llega:mins($('#vLlega').value)}
   };
   let err='';
-  if(!p.origen) err='Falta el origen: es lo único que no puede ser flexible.';
-  else if(!p.modos.size) err='Elige al menos un medio de transporte.';
+  if(!p.modos.size) err='Elige al menos un medio de transporte.';
   else if(p.ida.fijo&&!p.ida.fecha) err='Pon la fecha de ida o elige «Cualquier día».';
   else if(p.ida.fijo&&p.ida.fecha<HOY) err='La fecha de ida ya pasó.';
   else if(!solo&&p.vuelta.fijo&&!p.vuelta.fecha) err='Pon la fecha de vuelta, elige «Cualquier día» o marca «Solo ida».';
@@ -866,9 +885,11 @@ function leer(){
 
 /* ---------- pintado de resultados ---------- */
 function resumen(p){
-  const O=BY[p.origen], D=p.destino?BY[p.destino].name:(p.zona!=='*'?'cualquier lugar de '+$('#zona').selectedOptions[0].textContent:'cualquier lugar');
+  const zt=id=>$('#'+id).selectedOptions[0].textContent;
+  const O=p.origen?BY[p.origen].name:(p.zonaO!=='*'?'cualquier lugar de '+zt('zonaO'):'cualquier lugar');
+  const D=p.destino?BY[p.destino].name:(p.zona!=='*'?'cualquier lugar de '+zt('zona'):'cualquier lugar');
   const tr=(t,x)=>{ const a=[]; a.push(x.fijo?fFechaL(x.fecha):'cualquier día'); if(x.sale!=null)a.push('desde las '+hm(x.sale)); if(x.llega!=null)a.push('llegando antes de las '+hm(x.llega)); return t+' '+a.join(', '); };
-  return {titulo:`${O.name} → ${D}`, detalle:[tr('Ida',p.ida),p.soloIda?'solo ida':tr('vuelta',p.vuelta),p.maxDur?'máx. '+fDur(p.maxDur)+' por trayecto':'sin límite de duración',[...p.modos].map(m=>MODO_TXT[m].toLowerCase()).join(' · ')]};
+  return {titulo:`${O} → ${D}`, detalle:[tr('Ida',p.ida),p.soloIda?'solo ida':tr('vuelta',p.vuelta),p.maxDur?'máx. '+fDur(p.maxDur)+' por trayecto':'sin límite de duración',[...p.modos].map(m=>MODO_TXT[m].toLowerCase()).join(' · ')]};
 }
 function modosIco(o){ return o.modos.map(m=>ICO[m]).join(''); }
 function nombreModos(o){ return o.modos.map(m=>MODO_TXT[m]).join(' + '); }
@@ -902,21 +923,23 @@ function billete(r,i,p){
     <div class="stub"><span class="n">Nº ${pad(i+1)}</span>
       <div><div class="precio">${b.total}<sup>€</sup></div><div class="nota">${b.vuelta?'ida y vuelta':'solo ida'} · por persona</div></div></div>
     <div class="cuerpo">
-      <div class="dest"><h3>${esc(D.name)}</h3><span class="pais">${esc(D.pais)}</span><span class="cod">${D.id}</span></div>
+      <div class="dest">${p.origen?`<h3>${esc(D.name)}</h3><span class="pais">${esc(D.pais)}</span><span class="cod">${D.id}</span>`
+        :p.destino?`<h3><small>desde</small> ${esc(r.orig.name)}</h3><span class="pais">${esc(r.orig.pais)}</span><span class="cod">${r.orig.id}</span>`
+        :`<h3>${esc(r.orig.name)} → ${esc(D.name)}</h3><span class="pais">${esc(r.orig.pais)} → ${esc(D.pais)}</span><span class="cod">${r.orig.id}→${D.id}</span>`}</div>
       ${tramoHTML('IDA',b.ida)}${b.vuelta?tramoHTML('VUELTA',b.vuelta):''}
       <div class="pie">${alts}<div class="enl">${enlaces(b)}</div></div>
     </div></article>`;
 }
 function pinta(out,p){
   const R=resumen(p), s=out.stats, n=out.resultados.length;
-  const meta=`<b>${s.evaluados}</b> destinos evaluados · <b>${s.podados}</b> descartados por duración antes de calcular precios${s.sinRuta?` · <b>${s.sinRuta}</b> sin ruta con esos medios`:''} · <b>${s.validos}</b> con combinación válida`;
+  const meta=`<b>${s.evaluados}</b> ${p.origen?'destinos':'trayectos'} evaluados · <b>${s.podados}</b> descartados por duración antes de calcular precios${s.sinRuta?` · <b>${s.sinRuta}</b> sin ruta con esos medios`:''} · <b>${s.validos}</b> con combinación válida`;
   if(!n){
     $('#res').innerHTML=`<div class="cabres"><h2>${esc(R.titulo)}</h2></div><div class="vacio-res"><h3>Nada cabe en esa franja</h3>
       <p class="meta">${meta}</p><ul><li>Relaja una hora: «llego antes de» suele ser la que más descarta.</li><li>Sube la duración máxima o quítala.</li><li>Pasa alguna fecha a «Cualquier día».</li><li>Activa más medios: el tren y el barco solo existen donde hay vías o puertos.</li></ul></div>`;
     return;
   }
   $('#res').innerHTML=`<div class="cabres"><div><h2>${n===1&&p.destino?'':'Los '+n+' más baratos · '}<em>${esc(R.titulo)}</em></h2>
-    <p class="meta" style="margin-top:10px">${R.detalle.map(esc).join(' &nbsp;/&nbsp; ')}</p></div><p class="meta">${meta}.<br>${s.validos>n?`Mostrando ${n}, con tope de ${CONFIG.MAX_POR_PAIS} por país para que haya variedad. `:''}Orden: precio total, de menor a mayor.</p></div>`
+    <p class="meta" style="margin-top:10px">${R.detalle.map(esc).join(' &nbsp;/&nbsp; ')}</p></div><p class="meta">${meta}.<br>${s.recortado?`Con origen y destino libres a la vez son demasiados trayectos: solo se calculan los ${CONFIG.MAX_PARES} más cortos (${s.recortado} quedan fuera). Fija uno de los dos para verlos todos. `:''}${s.validos>n?`Mostrando ${n}, con tope de ${CONFIG.MAX_POR_PAIS} por país para que haya variedad. `:''}Orden: precio total, de menor a mayor.</p></div>`
     +out.resultados.map((r,i)=>billete(r,i,p)).join('');
 }
 

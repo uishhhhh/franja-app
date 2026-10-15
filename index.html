@@ -831,7 +831,7 @@ $('#soloIda').addEventListener('change',()=>{ muestra(); guarda(); });
 $$('#f select,#f input[type=date],#f input[name=modo]').forEach(x=>x.addEventListener('change',guarda));
 
 function guarda(){
-  try{ localStorage.setItem('franja:v1',JSON.stringify({o:origen.value,d:destino.value,ida:S.ida,vu:S.vuelta,
+  try{ localStorage.setItem('franja:v2',JSON.stringify({o:origen.value,d:destino.value,ida:S.ida,vu:S.vuelta,
     s:$('#soloIda').checked,z:$('#zona').value,zo:$('#zonaO').value,m:$('#maxDur').value,e:$('#estancia').value,
     h:[$('#idaSale').value,$('#idaLlega').value,$('#vSale').value,$('#vLlega').value],
     modos:$$('input[name=modo]:checked').map(i=>i.value),fi:$('#idaFecha').value,fv:$('#vFecha').value})); }catch(e){}
@@ -839,14 +839,14 @@ function guarda(){
 function porDefecto(){
   // ida: el próximo viernes (mínimo dentro de 3 días); vuelta: el domingo siguiente
   let d=addDays(HOY,3); while(dow(d)!==5) d=addDays(d,1);
-  origen.set('MAD'); destino.set(null);
+  origen.set(null); destino.set(null);
   $('#idaFecha').value=d; $('#vFecha').value=addDays(d,2);
   $('#idaSale').value='1080'; $('#vLlega').value='1320';
 }
 function restaura(){
   porDefecto();
   try{
-    const g=JSON.parse(localStorage.getItem('franja:v1')||'null'); if(!g) return;
+    const g=JSON.parse(localStorage.getItem('franja:v2')||'null'); if(!g) return;
     if(g.o===null) origen.set(null); else if(g.o&&BY[g.o]) origen.set(g.o);
     if(g.d&&BY[g.d]) destino.set(g.d);
     S.ida=g.ida||'fecha'; S.vuelta=g.vu||'fecha'; $('#soloIda').checked=!!g.s;

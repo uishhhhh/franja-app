@@ -1,0 +1,14 @@
+{
+  "name": "franja",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Franja — metabuscador de viajes (avión, tren, barco) a tu hora",
+  "scripts": {
+    "www": "node -e \"const fs=require('fs');fs.rmSync('www',{recursive:true,force:true});fs.mkdirSync('www');['index.html','manifest.webmanifest','icon-192.png','icon-512.png'].forEach(f=>fs.copyFileSync(f,'www/'+f))\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0"
+  }
+}
